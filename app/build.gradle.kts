@@ -35,7 +35,7 @@ kotlin {
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.10.00"))
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3:1.4.0")
+    implementation("androidx.compose.material3:material3:1.5.0-rc01")
     implementation("androidx.compose.material:material-icons-core:1.7.8")
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")

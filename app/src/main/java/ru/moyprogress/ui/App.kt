@@ -40,7 +40,6 @@ private enum class Tab(val title: String, val icon: ImageVector) {
     SETTINGS("Настройки", Icons.Filled.Settings)
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MoyProgress(model: TrainingViewModel) {
     val settings by model.settings.collectAsStateWithLifecycle()
