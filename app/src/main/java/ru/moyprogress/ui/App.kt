@@ -179,6 +179,7 @@ private val fullDateFormat = DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.
 internal fun dateLabel(day: Long) = LocalDate.ofEpochDay(day).format(dateFormat)
 internal fun fullDate(day: Long) = LocalDate.ofEpochDay(day).format(fullDateFormat)
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Home(data: TrainingData, today: Long, model: TrainingViewModel, openTraining: () -> Unit) {
     val program = data.active
