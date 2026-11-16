@@ -24,7 +24,9 @@ jobs:
         with:
           gradle-version: '8.13'
       - name: Install Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;35.0.0
       - name: Test and assemble
         run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
       - name: Upload APK
@@ -34,11 +36,18 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Enable emulator acceleration
+        id: kvm
         run: |
+          if [[ ! -c /dev/kvm ]]; then
+            echo 'Emulator skipped because the runner has no /dev/kvm.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo 'available=true' >> "$GITHUB_OUTPUT"
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Launch on Android 8.0
+        if: steps.kvm.outputs.available == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 26

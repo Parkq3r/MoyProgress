@@ -119,7 +119,7 @@ private fun SetEntry(index: Int, entry: SetLog, log: ExerciseLog, timer: Stopwat
             second -> "Правая"
             else -> "Левая"
         }
-        val active = timer?.exerciseId == exercise.id && timer.setIndex == index && timer.sideTwo == second
+        val active = timer != null && timer.exerciseId == exercise.id && timer.setIndex == index && timer.sideTwo == second
         val actual = if (second) entry.second else entry.value
         SetValue(label, actual, entry.done, exercise.limit,
             adjust = { model.value(exercise.id, index, second, it, relative = true) },

@@ -105,9 +105,8 @@ fun MoyProgress(model: TrainingViewModel) {
                 ) { selected ->
                     when (Tab.valueOf(selected)) {
                         Tab.HOME -> Home(current, today, model) { tab = Tab.TRAINING.name }
-                        Tab.TRAINING -> if (current.draft != null)
-                            SessionScreen(current.draft, model)
-                        else Programs(current, today, model)
+                        Tab.TRAINING -> current.draft?.let { SessionScreen(it, model) }
+                            ?: Programs(current, today, model)
                         Tab.PROGRESS -> ProgressScreen(current, today)
                         Tab.SETTINGS -> SettingsScreen(settings, model)
                     }
