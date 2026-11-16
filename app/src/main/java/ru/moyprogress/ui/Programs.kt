@@ -99,19 +99,30 @@ internal fun Programs(data: TrainingData, today: Long, model: TrainingViewModel)
 @Composable
 private fun ProposalCard(proposal: Proposal, exercise: Exercise, workout: Workout, model: TrainingViewModel) {
     var step by rememberSaveable(proposal.id) { mutableIntStateOf(proposal.step) }
+    var setIndex by rememberSaveable(proposal.id) { mutableIntStateOf(proposal.setIndex) }
+    val available = proposal.before.indices.filter { proposal.before[it].low < exercise.limit }
     Panel {
         Text(exercise.name, style = MaterialTheme.typography.titleLarge)
-        val before = proposal.before[proposal.setIndex]
-        val after = increasedGoal(before, step)
-        Text("${workout.name} · подход ${proposal.setIndex + 1}")
+        Text(workout.name)
+        val before = proposal.before[setIndex]
+        val maxStep = minOf(proposal.step, exercise.limit - before.low)
+        val increment = step.coerceIn(1, maxStep)
+        val after = increasedGoal(before, increment)
+        if (available.size > 1) {
+            Choice("Изменить подход", available, setIndex, { "Подход ${it + 1}" }) {
+                setIndex = it
+            }
+        } else {
+            Text("Подход ${setIndex + 1}")
+        }
         Text("${before.label()} → ${after.label()} ${exercise.unit}")
-        if (proposal.step > 1) {
-            Text("Прибавка · $step ${exercise.unit}")
-            Slider(value = step.toFloat(), onValueChange = { step = kotlin.math.round(it).toInt() },
-                valueRange = 1f..proposal.step.toFloat(), steps = proposal.step - 2)
+        if (maxStep > 1) {
+            Text("Прибавка · $increment ${exercise.unit}")
+            Slider(value = increment.toFloat(), onValueChange = { step = kotlin.math.round(it).toInt() },
+                valueRange = 1f..maxStep.toFloat(), steps = maxStep - 2)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { model.review(proposal, step) }) { Text("Принять") }
+            Button(onClick = { model.review(proposal, increment, setIndex) }) { Text("Принять") }
             TextButton(onClick = { model.review(proposal, null) }) { Text("Отклонить") }
         }
     }

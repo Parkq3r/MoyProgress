@@ -22,4 +22,4 @@ gradle :app:testDebugUnitTest :app:assembleDebug
 - `domain` — модели, календарь, стартовая программа, расчёт прогресса.
 - `data` — хранилище Room, DataStore и резервные копии.
 - `TrainingViewModel` — операции над дневником и состояние приложения.
-- `ui` — четыре раздела Jetpack Compose с Material 3 Expressive.
+- `ui` — четыре раздела Jetpack Compose с Material 3 Expressive (библиотека Material 3 1.5.0-alpha07).

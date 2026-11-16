@@ -40,6 +40,7 @@ private enum class Tab(val title: String, val icon: ImageVector) {
     SETTINGS("Настройки", Icons.Filled.Settings)
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MoyProgress(model: TrainingViewModel) {
     val settings by model.settings.collectAsStateWithLifecycle()
@@ -229,7 +230,7 @@ private fun Home(data: TrainingData, today: Long, model: TrainingViewModel, open
             }
             Text(phase)
             if (total > 0) {
-                LinearProgressIndicator(progress = { count.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+                LinearWavyProgressIndicator(progress = { count.toFloat() / total }, modifier = Modifier.fillMaxWidth())
                 Text("Выполнено $count из $total", style = MaterialTheme.typography.bodySmall)
             }
         }

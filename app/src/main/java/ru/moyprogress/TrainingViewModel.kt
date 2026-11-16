@@ -201,16 +201,22 @@ class TrainingViewModel(app: Application) : AndroidViewModel(app) {
 
     fun discard() = perform { training.change { data -> data.copy(sessions = data.sessions.filter { it.finishedAt != null }) } }
 
-    fun review(proposal: Proposal, step: Int?) = perform {
+    fun review(proposal: Proposal, step: Int?, setIndex: Int = proposal.setIndex) = perform {
         training.change { data ->
             val live = data.proposals.firstOrNull { it.id == proposal.id } ?: return@change data
-            require(step == null || step in 1..live.step)
+            if (step != null) {
+                val limit = data.exercises.first { it.id == live.exerciseId }.limit
+                val goal = live.before.getOrNull(setIndex)
+                require(step in 1..live.step && goal != null && increasedGoal(goal, step).high <= limit) {
+                    "Выберите допустимую прибавку."
+                }
+            }
             val programs = if (step == null) data.programs else data.programs.map { program ->
                 if (program.id != live.programId) program else program.copy(workouts = program.workouts.map { workout ->
                     if (workout.id != live.workoutId) workout else workout.copy(exercises = workout.exercises.map { target ->
                         if (target.exerciseId != live.exerciseId || target.goals != live.before) target
                         else target.copy(goals = target.goals.mapIndexed { index, goal ->
-                            if (index == live.setIndex) increasedGoal(goal, step) else goal
+                            if (index == setIndex) increasedGoal(goal, step) else goal
                         })
                     })
                 })
