@@ -107,7 +107,7 @@ private fun ProposalCard(proposal: Proposal, exercise: Exercise, workout: Workou
         Text("${before.label()} → ${after.label()} ${exercise.unit}")
         if (proposal.step > 1) {
             Text("Прибавка · $step ${exercise.unit}")
-            Slider(value = step.toFloat(), onValueChange = { step = it.toInt() },
+            Slider(value = step.toFloat(), onValueChange = { step = kotlin.math.round(it).toInt() },
                 valueRange = 1f..proposal.step.toFloat(), steps = proposal.step - 2)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

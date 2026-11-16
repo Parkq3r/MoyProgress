@@ -29,6 +29,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import ru.moyprogress.TrainingViewModel
 import ru.moyprogress.domain.*
 

@@ -60,3 +60,5 @@ jobs:
             adb shell am start -W -n ru.moyprogress/.MainActivity
             sleep 8
             adb shell pidof ru.moyprogress
+            adb shell uiautomator dump /sdcard/moyprogress.xml
+            adb shell cat /sdcard/moyprogress.xml | grep -q 'text="Мой прогресс"'

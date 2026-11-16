@@ -26,15 +26,17 @@ class SettingsRepository(context: Context) {
 
     val settings = store.data.catch {
         if (it is IOException) emit(emptyPreferences()) else throw it
-    }.map {
+    }.map(::read)
+
+    private fun read(it: androidx.datastore.preferences.core.Preferences) =
         Preferences(it[theme] ?: "SYSTEM", it[dynamic] ?: true,
             (it[rest] ?: 90).coerceIn(15, 600), it[progression] ?: true,
             (it[streak] ?: 3).coerceIn(2, 6), (it[effort] ?: 7).coerceIn(4, 9),
             (it[recovery] ?: 2).coerceIn(1, 4))
-    }
 
-    suspend fun set(value: Preferences) {
+    suspend fun update(transform: (Preferences) -> Preferences) {
         store.edit {
+            val value = transform(read(it))
             it[theme] = value.theme
             it[dynamic] = value.dynamic
             it[rest] = value.rest.coerceIn(15, 600)

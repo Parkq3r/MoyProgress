@@ -54,7 +54,7 @@ class TrainingViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(update: (Preferences) -> Preferences) = perform {
-        settingsRepository.set(update(settings.value))
+        settingsRepository.update(update)
     }
 
     fun saveExercise(exercise: Exercise) = perform {
@@ -181,7 +181,20 @@ class TrainingViewModel(app: Application) : AndroidViewModel(app) {
             val draft = data.draft ?: return@change data
             require(draft.stopwatch == null) { "Остановите секундомер перед завершением." }
             val end = draft.copy(finishedAt = System.currentTimeMillis(), restUntil = null)
-            val completed = data.copy(sessions = data.sessions.map { if (it.id == draft.id) end else it })
+            val preferences = settings.value
+            val retained = data.proposals.filter { pending ->
+                if (end.recovery || pending.programId != end.programId || pending.workoutId != end.workoutId) true
+                else {
+                    val maxEffort = if (pending.exerciseId == "pull") minOf(7, preferences.maxEffort)
+                        else preferences.maxEffort
+                    end.logs.firstOrNull { it.exercise.id == pending.exerciseId }
+                        ?.successful(maxEffort) == true
+                }
+            }
+            val completed = data.copy(
+                sessions = data.sessions.map { if (it.id == draft.id) end else it },
+                proposals = retained
+            )
             completed.copy(proposals = completed.proposals + propose(completed, end, settings.value))
         }
     }

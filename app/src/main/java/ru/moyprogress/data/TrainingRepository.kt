@@ -2,6 +2,7 @@ package ru.moyprogress.data
 
 import android.content.Context
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -10,7 +11,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
 import androidx.room.withTransaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -18,23 +23,35 @@ import kotlinx.serialization.json.Json
 import ru.moyprogress.domain.*
 
 @Entity(tableName = "training_state")
-data class StoredTraining(@PrimaryKey val id: Int = 1, val payload: String)
+data class StoredTraining(@PrimaryKey val id: String, val payload: String)
 
 @Dao
 interface TrainingDao {
-    @Query("SELECT * FROM training_state WHERE id = 1")
-    fun observe(): kotlinx.coroutines.flow.Flow<StoredTraining?>
+    @Query("SELECT * FROM training_state")
+    fun observe(): kotlinx.coroutines.flow.Flow<List<StoredTraining>>
 
-    @Query("SELECT * FROM training_state WHERE id = 1")
-    suspend fun read(): StoredTraining?
+    @Query("SELECT * FROM training_state")
+    suspend fun read(): List<StoredTraining>
 
     @Upsert
-    suspend fun upsert(record: StoredTraining)
+    suspend fun upsert(records: List<StoredTraining>)
+
+    @Delete
+    suspend fun delete(records: List<StoredTraining>)
 }
 
-@Database(entities = [StoredTraining::class], version = 1, exportSchema = false)
+@Database(entities = [StoredTraining::class], version = 2, exportSchema = false)
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun training(): TrainingDao
+}
+
+private val sessionRowsMigration = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE training_state RENAME TO training_state_legacy")
+        db.execSQL("CREATE TABLE training_state (id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(id))")
+        db.execSQL("INSERT INTO training_state (id, payload) SELECT 'legacy', payload FROM training_state_legacy WHERE id = 1")
+        db.execSQL("DROP TABLE training_state_legacy")
+    }
 }
 
 @Serializable
@@ -43,29 +60,34 @@ private data class Backup(val version: Int, val data: TrainingData)
 class TrainingRepository(context: Context) {
     private val database = Room.databaseBuilder(
         context, TrainingDatabase::class.java, "moy-progress.db"
-    ).build()
+    ).addMigrations(sessionRowsMigration).build()
     private val dao = database.training()
     private val json = Json { encodeDefaults = true }
 
-    val data = dao.observe().map { record ->
-        record?.let { json.decodeFromString<Backup>(it.payload).data }
-    }
+    val data = dao.observe().map(::decode).flowOn(Dispatchers.Default)
 
     suspend fun initialize() {
         database.withTransaction {
-            if (dao.read() == null) store(initialData(LocalDate.now().toEpochDay()))
+            val records = dao.read()
+            if (records.none { it.id == "metadata" }) {
+                store(records, decode(records) ?: initialData(LocalDate.now().toEpochDay()))
+            }
         }
     }
 
     suspend fun change(transform: (TrainingData) -> TrainingData) {
         database.withTransaction {
-            val current = read()
+            val records = dao.read()
+            val current = decode(records) ?: initialData(LocalDate.now().toEpochDay())
             val next = transform(current)
-            if (next != current) store(next)
+            if (next != current) store(records, next)
         }
     }
 
-    suspend fun export(): String = json.encodeToString(Backup(1, read()))
+    suspend fun export(): String {
+        val data = decode(dao.read()) ?: error("Дневник ещё не открыт.")
+        return json.encodeToString(Backup(1, data))
+    }
 
     suspend fun import(text: String) {
         val backup = try {
@@ -78,12 +100,29 @@ class TrainingRepository(context: Context) {
         change { backup.data }
     }
 
-    private suspend fun read(): TrainingData =
-        dao.read()?.let { json.decodeFromString<Backup>(it.payload).data }
-            ?: initialData(LocalDate.now().toEpochDay())
+    private fun decode(records: List<StoredTraining>): TrainingData? {
+        val metadata = records.firstOrNull { it.id == "metadata" }
+            ?: return records.firstOrNull { it.id == "legacy" }
+                ?.let { json.decodeFromString<Backup>(it.payload).data }
+        val data = json.decodeFromString<TrainingData>(metadata.payload)
+        val sessions = records.asSequence().filter { it.id.startsWith("session:") }
+            .map { json.decodeFromString<Session>(it.payload) }
+            .sortedWith(compareBy<Session> { it.day }.thenBy { it.finishedAt }).toList()
+        return data.copy(sessions = sessions)
+    }
 
-    private suspend fun store(data: TrainingData) {
-        dao.upsert(StoredTraining(payload = json.encodeToString(Backup(1, data))))
+    private suspend fun store(previous: List<StoredTraining>, data: TrainingData) {
+        val next = buildList {
+            add(StoredTraining("metadata", json.encodeToString(data.copy(sessions = emptyList()))))
+            data.sessions.forEach { session ->
+                add(StoredTraining("session:${session.id}", json.encodeToString(session)))
+            }
+        }.associateBy { it.id }
+        val before = previous.associateBy { it.id }
+        val removed = previous.filter { it.id !in next }
+        val changed = next.values.filter { before[it.id] != it }
+        if (removed.isNotEmpty()) dao.delete(removed)
+        if (changed.isNotEmpty()) dao.upsert(changed)
     }
 }
 
@@ -117,7 +156,7 @@ private fun valid(data: TrainingData): Boolean {
         validDate(session.day) && validDate(session.slot) && session.week in 1..52 &&
             validName(session.label) && session.logs.isNotEmpty() &&
             unique(session.logs.map { it.exercise.id }) &&
-            (timer == null || (timerLog?.exercise?.timed == true &&
+            (timer == null || (timerLog != null && timerLog.exercise.timed &&
                 timer.setIndex in timerLog.sets.indices && (!timer.sideTwo || timerLog.exercise.sided))) &&
             session.logs.all { log ->
                 val limit = log.exercise.limit
